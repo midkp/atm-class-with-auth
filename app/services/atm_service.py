@@ -67,6 +67,8 @@ class ATMService:
 
     async def show_balance(self, username: str):
         try:
+            logger.debug(f"Fetching balance for username: {username}")  # Log the username being passed
+            
             # Use 'select' to create the query
             stmt = select(User).filter(User.username == username)
 
@@ -79,7 +81,8 @@ class ATMService:
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
-            return {"balance": user.balance}
+            # Return the username and balance at the top level, without nested structure
+            return {"username": user.username, "balance": user.balance}
         except Exception as e:
             logger.error(f"Error in fetching balance for {username}: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
@@ -92,9 +95,11 @@ class ATMService:
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
+            # Query transactions for the user
             result = await self.db.execute(select(Transaction).filter(Transaction.user_id == user.id))
             transactions = result.scalars().all()  # Fetch all the transactions asynchronously
 
+            # Return transaction details
             return [{"type": tx.type, "amount": tx.amount, "date": tx.date} for tx in transactions]
         except Exception as e:
             logger.error(f"Error in fetching transactions for {username}: {str(e)}")

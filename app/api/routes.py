@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.database import get_db
 from app.controller.account_controller import AccountController
 from app.core.config import CreateAccountRequest, DepositWithdrawRequest, BalanceTransactions
+import logging
 
 router = APIRouter()
 
@@ -41,17 +42,24 @@ async def withdraw(request: DepositWithdrawRequest, db: AsyncSession = Depends(g
     return await controller.withdraw(request.username, request.amount)
 
 # Check balance - renamed from /balance to /check-balance
+import logging
+
+# Configure logging
+logger = logging.getLogger("uvicorn")
+
 @router.get("/check-balance", tags=["Account"])
 async def check_balance(username: str, db: AsyncSession = Depends(get_db)):
+    logger.debug(f"Received request for check balance with username: {username}")
     controller = AccountController(db)
     try:
         balance = await controller.show_balance(username)
         if balance is None:
             raise HTTPException(status_code=404, detail="User not found")
-        return {"username": username, "balance": balance}
+        return balance
     except HTTPException as e:
         raise e
     except Exception as e:
+        logger.error(f"Error fetching balance: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 # Show transactions - renamed from /transactions to /show-transactions
