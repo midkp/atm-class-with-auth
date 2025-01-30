@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.database import get_db
 from app.controller.account_controller import AccountController
-from app.core.config import CreateAccountRequest, DepositWithdrawRequest, BalanceTransactions
+from app.core.config import CreateAccountRequest, DepositWithdrawRequest
+from app.schemas import LoginRequest
 
 router = APIRouter()
 
@@ -14,12 +15,12 @@ async def create_account(request: CreateAccountRequest, db: AsyncSession = Depen
 
 # Login - authenticate the user
 @router.post("/login", tags=["Authentication"], name="Login")
-async def login(username: str, password: str, db: AsyncSession = Depends(get_db)):
+async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)): 
     controller = AccountController(db)
-    
-    # Here, replace with proper password hashing and validation
-    if await controller.authenticate(username, password):  # Assuming you have an `authenticate` method
-        return {"message": "Login successful"}
+    # Authenticate user with username and pin
+    token = await controller.authenticate(request.username, request.pin)
+    if token:
+        return {"message": "Login successful", "token": token}
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -40,22 +41,11 @@ async def withdraw(request: DepositWithdrawRequest, db: AsyncSession = Depends(g
     controller = AccountController(db)
     return await controller.withdraw(request.username, request.amount)
 
-# Check balance - renamed from /balance to /check-balance
+# Check balance
 @router.get("/check-balance", tags=["Account"])
 async def check_balance(username: str, db: AsyncSession = Depends(get_db)):
     controller = AccountController(db)
-    try:
-        balance = await controller.show_balance(username)
-        if balance is None:
-            raise HTTPException(status_code=404, detail="User not found")
-        return {"username": username, "balance": balance}
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-
-# Show transactions - renamed from /transactions to /show-transactions
-@router.get("/show-transactions", tags=["Account Information"], name="View Transactions")
-async def show_transactions(username: str = Query(..., description="The username for which to fetch transactions"), db: AsyncSession = Depends(get_db)):
-    controller = AccountController(db)
-    return await controller.show_transactions(username)
+    balance = await controller.show_balance(username)
+    if balance is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"username": username, "balance": balance}

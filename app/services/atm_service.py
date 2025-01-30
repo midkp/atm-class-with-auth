@@ -74,28 +74,32 @@ class ATMService:
             result = await self.db.execute(stmt)
 
             # Fetch the results as a list of rows
-            user = result.scalars().first()  # Use scalars().first() for async result fetching
+            user = result.scalars().first()  # Use scalars().first() for async result
 
-            if not user:
+            if user:
+                return user.balance
+            else:
                 raise HTTPException(status_code=404, detail="User not found")
-
-            return {"balance": user.balance}
         except Exception as e:
-            logger.error(f"Error in fetching balance for {username}: {str(e)}")
+            logger.error(f"Error fetching balance for user {username}: {e}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    async def show_transactions(self, username):
+    async def show_transactions(self, username: str):
         try:
             # Querying asynchronously
-            result = await self.db.execute(select(User).filter(User.username == username))
-            user = result.scalars().first()
-            if not user:
-                raise HTTPException(status_code=404, detail="User not found")
-
-            result = await self.db.execute(select(Transaction).filter(Transaction.user_id == user.id))
-            transactions = result.scalars().all()  # Fetch all the transactions asynchronously
-
-            return [{"type": tx.type, "amount": tx.amount, "date": tx.date} for tx in transactions]
+            result = await self.db.execute(select(Transaction).filter(Transaction.username == username))
+            transactions = result.scalars().all()  # Use scalars().all() for fetching all results
+            return transactions
         except Exception as e:
-            logger.error(f"Error in fetching transactions for {username}: {str(e)}")
+            logger.error(f"Error fetching transactions for user {username}: {e}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    async def get_user_by_username(self, username: str):
+            try:
+                # Querying asynchronously to find the user by username
+                result = await self.db.execute(select(User).filter(User.username == username))
+                user = result.scalars().first()  # Get the first user matching the username
+                return user
+            except Exception as e:
+                logger.error(f"Error fetching user {username}: {e}")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
